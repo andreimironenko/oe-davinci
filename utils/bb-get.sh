@@ -19,8 +19,14 @@ declare COMMAND=""
 declare PRODUCT=""
 declare -i DEVFLAG=0
 
-declare SERVER="xw6400"
-declare GITROOT="/opt/github"
+
+#declare SERVER="xw6400"
+#declare GITROOT="/opt/github"
+
+#git@github.com:andreimironenko/oe-davinci.git
+declare SERVER="github.com"
+declare GITROOT="andreimironenko/"
+
 
 declare OEBASE=`pwd`
 declare ARAGO="arago"
@@ -41,6 +47,7 @@ declare PRODUCTS_DIR="${GITROOT}/products"
 declare DEVURLS_CONF="devurls.conf"
 declare OEURLS_CONF="oeurls.conf"
 declare OEDEVURLS_CONF="oedevurls.conf"
+declare PRODUCTURLS_CONF="producturls.conf"
 
 
 # Check the existense of devurls.conf in the OE base directory
@@ -99,8 +106,27 @@ done
 printf "%s\n" "Ok"
 
 
+printf "%s" "Parsing $PRODUCTURLS_CONF ... "
+if [ -f ./$PRODUCTURLS_CONF ] ; then
+	PRODUCTDIRS=( $(awk '!/^($|[[:space:]]*#)/{print $1;}' ./$PRODUCTURLS_CONF) )
+	PRODUCTURLS=( $(awk '!/^($|[[:space:]]*#)/{print $2;}' ./$PRODUCTURLS_CONF) )
+	PRODUCTBRANCHES=( $(awk '!/^($|[[:space:]]*#)/{print $3;}' ./$PRODUCTURLS_CONF) )
+else
+	PRODUCTDIRS=( $(awk '!/^($|[[:space:]]*#)/{print $1;}' $BB_GET_INSTALLDIR/$PRODUCTURLS_CONF) )
+	PRODUCTURLS=( $(awk '!/^($|[[:space:]]*#)/{print $2;}' $BB_GET_INSTALLDIR/$PRODUCTURLS_CONF) )
+	PRODUCTBRANCHES=( $(awk '!/^($|[[:space:]]*#)/{print $3;}' $BB_GET_INSTALLDIR/$PRODUCTURLS_CONF) )
+fi
+
+for (( d = 0; d < ${#PRODUCTURLS[@]}; d++ )) ; do
+ 
+    PRODUCTURLS[$d]="${GITROOT}${PRODUCTURLS[$d]}"
+done
+printf "%s\n" "Ok"
+
+
 #declare USER=`whoami`
-declare USER="andrei"
+#declare USER="andrei"
+declare USER="git"
 
 declare -rx SCRIPT=${0##*/}
 
@@ -423,71 +449,6 @@ if [ "$DEVFLAG" = "1" ] ; then
 		fi
 	done
 
-	execute cd $OEBASE	
-	#Create pd-products if it does not exist yet	
-	if [ ! -d ${OEBASE}/pd-products ] ; then
-		execute mkdir -p ${OEBASE}/pd-products
-	fi
-	
-	if [ -z ${PRODUCT} ] ; then
-		printf "%s\n" "Installing all available products"
-		#List all products git repositories and save them in the product array
-		declare -a products=( $( ssh $USER@$SERVER ls -1 ${PRODUCTS_DIR} ) )
-	
-		declare -a product_dirs;	
-		#Generate products directories from products array
-		for (( d=0 ; d < ${#products[*]} ; d ++ )) ; do
-			product_dirs[$d]=${products[$d]/.git/}
-		done
-	
-		execute cd $OEBASE/pd-products
-		for ((index=0; index < ${#product_dirs[*]}; index ++)) ; do
-			printf "%s\n" "Installing ${product_dirs[$index]} product"
-			if [ -d ${OEBASE}/pd-products/${product_dirs[$index]} ] ; then
-				cd  $OEBASE/pd-products/${product_dirs[$index]}
-				printf "%s\n" "Current directory $PWD"
-				execute git pull origin master
-				execute git fetch origin master --tags
-
-				# Check if the current branch match the one from devurls.sh
-				current_branch=`git branch | grep -F "*" | sed -e 's/*//g'`
-				#Removing any spaces
-				current_branch="${current_branch// /}"
-				# If it's not, checkout it with --track option
-				if [ "$current_branch" != "master" ] ; then
-
-					remote_status=`git remote show origin | grep ${current_branch} | grep "tracked"`
-					remote_status=$?
-
-					if [  "$remote_status" -eq "0" ] ; then 
-						execute git pull origin ${current_branch}
-                                		execute git fetch origin ${current_branch} --tags
-					else
-                                    		printf "%s\n" "Warning: Please consider pushing your ${current_branch} branch to EBS"
-                                    		printf "%s\n" "At the moment local branch is not tracked, update is skipped"
-					fi
-
-				fi
-				execute cd $OEBASE 
-				printf "%s\n" "After popd directory $PWD"
-			else 
-				git clone $USER@$SERVER:${GITROOT}/products/${products[$index]}
-			fi
-		done 
-		execute cd $OEBASE 
-	else
-		printf "%s\n" "Installing $PRODUCT"
-		cd $OEBASE/pd-products
-		if [ -d ${OEBASE}/pd-products/${PRODUCT} ] ; then
-			execute cd  $OEBASE/pd-products/${PRODUCT}
-			execute git pull origin master
-			execute git fetch origin master --tags
-			execute cd $OEBASE 
-		else 
-			git clone $USER@$SERVER:${GITROOT}/products/$PRODUCT.git
-		fi
-		execute cd $OEBASE 
-	fi 
 else
 	#Release build handling
 	
@@ -560,6 +521,49 @@ else
 	fi
 	cd $OEBASE
 fi
+
+printf "%s\n" "Start cloning OE overlays"
+	
+for (( i=0; i < ${#PRODUCTDIRS[*]} ; i ++ )) ; do
+	
+	printf "%s\n" "Start cloning/updating ${PRODUCTURLS[$i]} overlay "
+	if [ -d ${PRODUCTDIRS[$i]} ] ; then
+		execute cd ${PRODUCTDIRS[$i]}
+		execute git pull origin master 
+		execute git fetch origin master --tags
+
+		current_branch=`git branch | grep -F "*" | sed -e 's/*//g'`
+		#Removing any spaces
+		current_branch="${current_branch// /}"
+		# If it's not, checkout it with --track option
+		if [ "$current_branch" != "master" ] ; then
+	
+			remote_status=`git remote show origin | grep ${current_branch} | grep "tracked"`
+			remote_status=$?
+	
+			if [  "$remote_status" -eq "0" ] ; then 
+				execute git pull origin ${current_branch}
+               	execute git fetch origin ${current_branch} --tags
+			else
+                printf "%s\n" "Warning: Please consider pushing your ${current_branch} branch to EBS"
+            	printf "%s\n" "At the moment local branch is not tracked, update is skipped"
+			fi
+	
+		fi	
+		execute cd ${OEBASE} 
+	else	 
+		execute git clone $USER@$SERVER:${PRODUCTURLS[$i]} ${PRODUCTDIRS[$i]}
+		execute cd ${OEBASE}/${PRODUCTDIRS[$i]}
+		if [ "${PRODUCTBRANCHES[$i]}" != "master" ] ; then
+			execute git checkout --track origin/${PRODUCTBRANCHES[$i]}
+		fi
+		execute cd ${OEBASE} 
+	fi
+done
+
+
+
+
 
 printf "%s\n" "Fetching downloads folder..."
 #rsync -av $OE_DOWNLOADS_DIR ./
@@ -707,25 +711,10 @@ function update_package
 function update_handler
 {
 	
-	# List failed packages	
-	#not_cleaned_packages
-	#not_synched_packages
-	#pull_failed_packages
-	#not_tracked_packages
-	#default_pull_failed_packages
-	
-
 	printf "\n%s\n" "===================================================================="
 	printf "%s\n" "Start updating OE packages"
 	printf "\n%s\n" "===================================================================="
 		
-	#update_package $ARAGO $ARAGO_URL "master"
-	#update_package $ARAGO_BITBAKE $ARAGO_BITBAKE_URL "master"
-	#update_package $ARAGO_OE_DEV $ARAGO_OE_DEV_URL "master"
-	#update_package $PD_APPS $PD_APPS_URL "master"
-	#update_package $PD_SYSTEM $PD_SYSTEM_URL "master"
-	#update_package $PD_APPS_DEV $PD_APPS_DEV_URL "master"
-	#update_package $PD_SYSTEM_DEV $PD_SYSTEM_DEV_URL "master"
 	
 	for (( i=0; i < ${#OEDIRS[*]} ; i ++ )) ; do
 		update_package ${OEDIRS[$i]} ${OEURLS[$i]} ${OEBRANCHES[$i]} 
@@ -747,31 +736,10 @@ function update_handler
 	printf "\n%s\n" "===================================================================="
 	printf "\n%s\n" "Start updating products"
 	printf "\n%s\n" "===================================================================="
-	execute cd $OEBASE	
-	#Create pd-products if it does not exist yet	
-	if [ ! -d ${OEBASE}/pd-products ] ; then
-		execute mkdir -p ${OEBASE}/pd-products
-	fi
-	
-	#List all products git repositories and save them in the product array
-	declare -a products=( $(ssh $USER@$SERVER ls -1 ${PRODUCTS_DIR}) )
-
-	declare -a product_dirs;	
-	#Generate products directories from products array
-	for (( d=0 ; d < ${#products[*]} ; d ++ )) ; do
-		product_dirs[$d]=${products[$d]/.git/}
+   	declare -i index
+	for ((index=0; index < ${#PRODUCTDIRS[*]}; index ++)) ; do
+		update_package ${PRODUCTDIRS[$index]} ${PRODUCTURLS[$index]} ${PRODUCTBRANCHES[$index]} 
 	done
-
-	execute cd $OEBASE/pd-products
-	for ((index=0; index < ${#product_dirs[*]}; index ++)) ; do
-	
-		if [ -d ${OEBASE}/pd-products/${product_dirs[$index]} ] ; then
-		
-			update_package  "pd-products/${product_dirs[$index]}" "${GITROOT}/products/${products[$index]}" "master"
-		fi
-		
-	done 
-	
 	
 	execute cd $OEBASE 
 
@@ -865,14 +833,13 @@ function status_handler
 	printf "%s\n" "Done"	
 	fi
 	
-	printf "%s" "Examining the status for all checked out products ..."
-	product_list=( $( ls -1 ${OEBASE}/pd-products ) )
-	for (( index = 0; index < ${#product_list[@]}; index ++ )) ; do
-		cd ${OEBASE}/pd-products/${product_list[$index]}
+	printf "%s" "Examining the status for all products ..."
+	for ((index=0; index < ${#PRODUCTDIRS[*]}; index ++)) ; do
+		cd ${OEBASE}/${PRODUCTDIRS[$index]}
 		git status | grep -e "modified" -e "Untracked" > /dev/null
 		
 		if [ "$?" -eq 0 ] ; then
-			modified[$m]="pd-products/${product_list[$index]}"
+			modified[$m]=${PRODUCTDIRS[$index]}
 			let "m++"
 		fi
 		
@@ -881,11 +848,12 @@ function status_handler
 		sync_status=( $(git diff --name-only origin/${branch}) )
 		
 		if [ ${#sync_status[*]} -ne 0 ] ; then
-			unsynced[$u]="pd-products/${product_list[$index]}"
+			unsynced[$u]=${PRODUCTDIRS[$index]}
 			(( u++ ))
 		fi
 	done
 	printf "%s\n" "Done"	
+
 	
 	printf "\n"
 	printf "%s\n" "Got the following results:"
@@ -927,11 +895,11 @@ function describe_handler
 	# Check either the build environment as a development environment
 	is_dev
 	if [ $? -eq 0 ] ; then
-		for ((index=0; index < ${#OEDIRS_DEV[*]}; index ++)) ; do
-			cd ${OEBASE}/${OEDIRS_DEV[$index]}
+		for ((index=0; index < ${#OEDEVDIRS[*]}; index ++)) ; do
+			cd ${OEBASE}/${OEDEVDIRS[$index]}
 			echo ""
 			printf "%s\n" "--------------------------------------------------------"
-			printf "%s\n" "${OEDIRS_DEV[$index]}  "
+			printf "%s\n" "${OEDEVDIRS[$index]}  "
 			printf "%s\n" "--------------------------------------------------------"
 			printf "%s\n" "last commit"
 			printf "  "
