@@ -448,81 +448,8 @@ if [ "$DEVFLAG" = "1" ] ; then
 			execute cd ${OEBASE} 
 		fi
 	done
-
-else
-	#Release build handling
 	
-	#The product and its release must be specified
-	if [ -z "${PRODUCT}" -o -z "${PRODUCT_RELEASE}" ] ; then
-		printf "%s\n" "Either product and/or product release was not provided!"
-		printf "%s\n" "Usage for release build:"
-		printf "%s\t\n" "bb-get install -r r03-rc2 gstproto" 
-		exit 193 
-	fi
-
-	if [ ! -d $OEBASE/pd-products ] ; then	
-		execute mkdir -p $OEBASE/pd-products
-	fi
-	
-	cd $OEBASE/pd-products
-	if [ -d $OEBASE/pd-products/$PRODUCT ] ; then
-		printf "%s\n" "$PRODUCT product folder already exists"
-		printf "%s\n" "Make sure you use empty folder for the getting product release build environment!"
-		exit 194	
-	else
-		execute git clone $USER@$SERVER:${GITROOT}/products/$PRODUCT.git
-		execute cd $OEBASE/pd-products/$PRODUCT
-		execute git reset --hard ${PRODUCT_RELEASE} 
-		execute cd $OEBASE 
-	fi
-
-	source $OEBASE/pd-products/$PRODUCT/release.inc
-
-	# Check that there is no any overlay folder exist
-	dirs=( $( ls -1 ) )
-	if [ ${#dirs[*]} -ne 0 ] ; then
-		printf "%s\n" "OE overlay folder(s) are already exists:"
-		printf "%s\n" "${dirs[@]}"
-		printf "%s\n" "Make sure you use empty folder for the getting product release build environment!"
-		#exit 194	 			 	
-	fi
-	execute git clone $USER@$SERVER:$ARAGO_URL $ARAGO
-	cd $OEBASE/$ARAGO
-	if [ ! -z "${OEREVS[0]}" ] ; then
-		execute git reset --hard "${OEREVS[0]}"
-	fi
-	cd $OEBASE
-	
-	execute git clone $USER@$SERVER:$ARAGO_BITBAKE_URL $ARAGO_BITBAKE
-	cd $OEBASE/$ARAGO_BITBAKE
-	if [ ! -z "${OEREVS[1]}" ] ; then
-		execute git reset --hard "${OEREVS[1]}"
-	fi
-	cd $OEBASE
-	
-	execute git clone $USER@$SERVER:$ARAGO_OE_DEV_URL $ARAGO_OE_DEV
-	cd $OEBASE/$ARAGO_OE_DEV
-	if [ ! -z "${OEREVS[2]}" ] ; then
-		git reset --hard "${OEREVS[2]}"
-	fi
-	cd $OEBASE
-	
-	execute git clone $USER@$SERVER:$PD_APPS_URL $PD_APPS 
-	cd $OEBASE/$PD_APPS
-	if [ ! -z "${OEREVS[3]}" ] ; then
-		git reset --hard "${OEREVS[3]}"
-	fi
-	cd $OEBASE
-	
-	execute git clone $USER@$SERVER:$PD_SYSTEM_URL $PD_SYSTEM
-	cd $OEBASE/$PD_SYSTEM
-	if [ ! -z "${OEREVS[4]}" ] ; then
-		git reset --hard "${OEREVS[4]}"
-	fi
-	cd $OEBASE
-fi
-
-printf "%s\n" "Start cloning OE overlays"
+	printf "%s\n" "Start cloning OE overlays"
 	
 for (( i=0; i < ${#PRODUCTDIRS[*]} ; i ++ )) ; do
 	
@@ -560,6 +487,83 @@ for (( i=0; i < ${#PRODUCTDIRS[*]} ; i ++ )) ; do
 		execute cd ${OEBASE} 
 	fi
 done
+
+
+
+else
+	#Release build handling
+	
+	#The product and its release must be specified
+	if [ -z "${PRODUCT}" -o -z "${PRODUCT_RELEASE}" ] ; then
+		printf "%s\n" "Either product and/or product release was not provided!"
+		printf "%s\n" "Usage for release build:"
+		printf "%s\t\n" "bb-get install -r r03-rc2 gstproto" 
+		exit 193 
+	fi
+
+	if [ ! -d $OEBASE/pd-products ] ; then	
+		execute mkdir -p $OEBASE/pd-products
+	fi
+	
+	cd $OEBASE/pd-products
+	if [ -d $OEBASE/pd-products/$PRODUCT ] ; then
+		printf "%s\n" "$PRODUCT product folder already exists"
+		printf "%s\n" "Make sure you use empty folder for the getting product release build environment!"
+		exit 194	
+	else
+		execute git clone git://${SERVER}/${GITROOT}/${PRODUCT}.git pd-products/${PRODUCT}
+		execute cd ${OEBASE}/pd-products/$PRODUCT
+		execute git checkout -b "branch.${PRODUCT_RELEASE}" ${PRODUCT_RELEASE} 
+		execute cd $OEBASE 
+	fi
+
+	source $OEBASE/pd-products/$PRODUCT/release.inc
+
+	# Check that there is no any overlay folder exist
+	dirs=( $( ls -1 ) )
+	if [ ${#dirs[*]} -ne 0 ] ; then
+		printf "%s\n" "OE overlay folder(s) are already exists:"
+		printf "%s\n" "${dirs[@]}"
+		printf "%s\n" "Make sure you use empty folder for the getting product release build environment!"
+		#exit 194	 			 	
+	fi
+	
+	
+	execute git clone git://$SERVER/$ARAGO_URL $ARAGO
+	cd $OEBASE/$ARAGO
+	if [ ! -z "${OEREVS[0]}" ] ; then
+		execute git checkout -b "branch.${OEREVS[0]}" "${OEREVS[0]}"
+	fi
+	cd $OEBASE
+	
+	execute git clone git://$SERVER/$ARAGO_BITBAKE_URL $ARAGO_BITBAKE
+	cd $OEBASE/$ARAGO_BITBAKE
+	if [ ! -z "${OEREVS[1]}" ] ; then
+		execute git checkout -b "branch.${OEREVS[1]}" "${OEREVS[1]}"
+	fi
+	cd $OEBASE
+	
+	execute git clone git://$SERVER/$ARAGO_OE_DEV_URL $ARAGO_OE_DEV
+	cd $OEBASE/$ARAGO_OE_DEV
+	if [ ! -z "${OEREVS[2]}" ] ; then
+		git  checkout -b "branch.${OEREVS[2]}" "${OEREVS[2]}"
+	fi
+	cd $OEBASE
+	
+	execute git clone git://$SERVER/$PD_APPS_URL $PD_APPS 
+	cd $OEBASE/$PD_APPS
+	if [ ! -z "${OEREVS[3]}" ] ; then
+		git checkout -b "branch.${OEREVS[3]}" "${OEREVS[3]}"
+	fi
+	cd $OEBASE
+	
+	execute git clone git://$SERVER/$PD_SYSTEM_URL $PD_SYSTEM
+	cd $OEBASE/$PD_SYSTEM
+	if [ ! -z "${OEREVS[4]}" ] ; then
+		git reset --hard "${OEREVS[4]}"
+	fi
+	cd $OEBASE
+fi
 
 
 

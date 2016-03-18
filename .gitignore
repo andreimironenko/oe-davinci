@@ -12,3 +12,8 @@ devurls.conf
 oedevurls.conf
 oeurls.conf
 producturls.conf
+.eclipse-data
+.project
+arago-tmp
+bb-get.describe
+downloads
