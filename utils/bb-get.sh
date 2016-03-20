@@ -25,7 +25,7 @@ declare -i DEVFLAG=0
 
 #git@github.com:andreimironenko/oe-davinci.git
 declare SERVER="github.com"
-declare GITROOT="andreimironenko/"
+declare GITROOT="andreimironenko"
 
 
 declare OEBASE=`pwd`
@@ -66,7 +66,7 @@ fi
 
 for (( d = 0; d < ${#DEVURLS[@]}; d++ )) ; do
  
-     DEVURLS[$d]="${GITROOT}${DEVURLS[$d]}"
+     DEVURLS[$d]="${GITROOT}/${DEVURLS[$d]}"
 done
 printf "%s\n" "Ok"
 
@@ -83,7 +83,7 @@ fi
 
 for (( d = 0; d < ${#OEURLS[@]}; d++ )) ; do
  
-     OEURLS[$d]="${GITROOT}${OEURLS[$d]}"
+     OEURLS[$d]="${GITROOT}/${OEURLS[$d]}"
 done
 printf "%s\n" "Ok"
 
@@ -101,7 +101,7 @@ fi
 
 for (( d = 0; d < ${#OEDEVURLS[@]}; d++ )) ; do
  
-    OEDEVURLS[$d]="${GITROOT}${OEDEVURLS[$d]}"
+    OEDEVURLS[$d]="${GITROOT}/${OEDEVURLS[$d]}"
 done
 printf "%s\n" "Ok"
 
@@ -119,7 +119,7 @@ fi
 
 for (( d = 0; d < ${#PRODUCTURLS[@]}; d++ )) ; do
  
-    PRODUCTURLS[$d]="${GITROOT}${PRODUCTURLS[$d]}"
+    PRODUCTURLS[$d]="${GITROOT}/${PRODUCTURLS[$d]}"
 done
 printf "%s\n" "Ok"
 
@@ -330,6 +330,8 @@ function is_git_synched
 function install_handler 
 {
 	
+if [ "$DEVFLAG" = "1" ] ; then
+
 	for (( i=0; i < ${#OEDIRS[*]} ; i ++ )) ; do
 	
 		printf "%s\n" "Start cloning/updating ${OEURLS[$i]} overlay "
@@ -368,7 +370,6 @@ function install_handler
 		fi
 	done
 
-if [ "$DEVFLAG" = "1" ] ; then
 	
 	printf "%s\n" "Start cloning OE overlays"
 	
@@ -489,7 +490,6 @@ for (( i=0; i < ${#PRODUCTDIRS[*]} ; i ++ )) ; do
 done
 
 
-
 else
 	#Release build handling
 	
@@ -505,63 +505,32 @@ else
 		execute mkdir -p $OEBASE/pd-products
 	fi
 	
-	cd $OEBASE/pd-products
 	if [ -d $OEBASE/pd-products/$PRODUCT ] ; then
 		printf "%s\n" "$PRODUCT product folder already exists"
 		printf "%s\n" "Make sure you use empty folder for the getting product release build environment!"
 		exit 194	
 	else
-		execute git clone git://${SERVER}/${GITROOT}/${PRODUCT}.git pd-products/${PRODUCT}
-		execute cd ${OEBASE}/pd-products/$PRODUCT
+	    cd $OEBASE/pd-products
+		printf "%s\n" "git clone git://${SERVER}/${GITROOT}/${PRODUCT}.git"
+		execute git clone git://${SERVER}/${GITROOT}/${PRODUCT}.git
+		execute cd $PRODUCT
 		execute git checkout -b "branch.${PRODUCT_RELEASE}" ${PRODUCT_RELEASE} 
 		execute cd $OEBASE 
 	fi
 
+    cd $OEBASE
+
 	source $OEBASE/pd-products/$PRODUCT/release.inc
 
-	# Check that there is no any overlay folder exist
-	dirs=( $( ls -1 ) )
-	if [ ${#dirs[*]} -ne 0 ] ; then
-		printf "%s\n" "OE overlay folder(s) are already exists:"
-		printf "%s\n" "${dirs[@]}"
-		printf "%s\n" "Make sure you use empty folder for the getting product release build environment!"
-		#exit 194	 			 	
-	fi
-	
-	
-	execute git clone git://$SERVER/$ARAGO_URL $ARAGO
-	cd $OEBASE/$ARAGO
-	if [ ! -z "${OEREVS[0]}" ] ; then
-		execute git checkout -b "branch.${OEREVS[0]}" "${OEREVS[0]}"
-	fi
-	cd $OEBASE
-	
-	execute git clone git://$SERVER/$ARAGO_BITBAKE_URL $ARAGO_BITBAKE
-	cd $OEBASE/$ARAGO_BITBAKE
-	if [ ! -z "${OEREVS[1]}" ] ; then
-		execute git checkout -b "branch.${OEREVS[1]}" "${OEREVS[1]}"
-	fi
-	cd $OEBASE
-	
-	execute git clone git://$SERVER/$ARAGO_OE_DEV_URL $ARAGO_OE_DEV
-	cd $OEBASE/$ARAGO_OE_DEV
-	if [ ! -z "${OEREVS[2]}" ] ; then
-		git  checkout -b "branch.${OEREVS[2]}" "${OEREVS[2]}"
-	fi
-	cd $OEBASE
-	
-	execute git clone git://$SERVER/$PD_APPS_URL $PD_APPS 
-	cd $OEBASE/$PD_APPS
-	if [ ! -z "${OEREVS[3]}" ] ; then
-		git checkout -b "branch.${OEREVS[3]}" "${OEREVS[3]}"
-	fi
-	cd $OEBASE
-	
-	execute git clone git://$SERVER/$PD_SYSTEM_URL $PD_SYSTEM
-	cd $OEBASE/$PD_SYSTEM
-	if [ ! -z "${OEREVS[4]}" ] ; then
-		git reset --hard "${OEREVS[4]}"
-	fi
+    printf "%s\n" "Number of cloning directories: ${#OEDIRS[@]}"
+    printf "%s\n" "${OEDIRS[@]}"		
+    for (( i=0; i < ${#OEDIRS[*]} ; i ++ )) ; do
+		git clone git://${SERVER}/${OEURLS[$i]} ${OEDIRS[$i]}
+		execute cd ${OEDIRS[$i]}
+		execute git checkout -b branch."${OEREVS[$i]}" "${OEREVS[$i]}" 
+		execute cd ${OEBASE} 
+	done
+
 	cd $OEBASE
 fi
 
