@@ -536,10 +536,36 @@ fi
 
 
 
+printf "%s\n" "Start installation of downloads folder..."
 
+cd $OEBASE
+attempts=3
 
-printf "%s\n" "Fetching downloads folder..."
-#rsync -av $OE_DOWNLOADS_DIR ./
+while [ $attempts -gt 0 ] ; do
+    printf "%s\n" "Getting downloads.tar.bz2. It really takes time! Be patient!"
+    wget http://support.z3technology.com/Angstrom/downloads.tar.bz2
+    wget http://support.z3technology.com/Angstrom/downloads.md5
+
+    printf "%s\n" "Checking MD5 of the downloaded tarball"
+    original_md5=`cat downloads.md5`
+    calculated_md5=`md5sum downloads.tar.bz2`
+    calculated_md5=${calculated_md5:0:32}
+
+    if [ $calculated_md5 = $original_md5 ] ; then
+        printf "%s\n" "Installing downloads.tar.bz2"
+        tar xvjf downloads.tar.bz2
+        break;
+    fi
+    let "attempts -= 1"
+done
+
+if [ $attempts -eq 0 ] ; then
+    printf "%s\n" "Retrieving of downloads.tar.bz2 has failed 3 times!"
+    printf "%s\n" "Unfortunately the build is not possible without this file"
+    printf "%s\n" "Try to check your connection by running this command:"
+    printf "%s\t\n" "wget http://support.z3technology.com/Angstrom/downloads.md5"
+    return 1
+fi
 
 printf "%s\n" "Getting OE build environment has completed" 	
 
@@ -629,15 +655,23 @@ function update_package
 		#Removing any spaces
 		current_branch="${current_branch// /}"
 
-		# First pull the defaul_branch	
-		execute git pull origin  ${default_branch}
+		# First fetch from the origin
+	    execute git fetch origin  
+		execute git fetch origin  --tags
+		if [ "$?" -ne "0" ] ; then
+			printf "%s\n" "Skipped"	
+			printf "%s\n\n" "Warning: The git fetch from the origin has failed"
+			execute popd
+			return $err_default_pull_failed
+		fi
+
+		execute git pull origin ${default_branch}
 		if [ "$?" -ne "0" ] ; then
 			printf "%s\n" "Skipped"	
 			printf "%s\n\n" "Warning: The git pull for the default branch has failed"
 			execute popd
 			return $err_default_pull_failed
 		fi
-		execute git fetch origin ${default_branch}  --tags
 	
 		if [ "${current_branch}" != ${default_branch} ] ; then
 			# Check either the remote branch does exist?			
@@ -717,10 +751,10 @@ function update_handler
 	execute cd $OEBASE 
 
 
-	printf "%s\n" ""
-	printf "%s" "Syncing downloads folder ... "
-	execute rsync -av $OE_DOWNLOADS_DIR ./
-	printf "%s\n" "Ok"
+	#printf "%s\n" ""
+	#printf "%s" "Syncing downloads folder ... "
+	#execute rsync -av $OE_DOWNLOADS_DIR ./
+	#printf "%s\n" "Ok"
 
 	return 0
 }
